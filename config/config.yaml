@@ -478,3 +478,139 @@ endpoints:
     conditions:
       - "[CONNECTED] == true"
       - "[STATUS] < 500"
+
+# --- iDRAC 9 / Redfish (mgmt net 10.135.4.2, self-signed cert) ---
+# BMC root needs NO auth; the authenticated health endpoints are staged with
+# enabled:false until the status-read credentials verify (2026-10-05: Redfish
+# rejects them with SYS415 invalid username/password — re-check with the user).
+  - name: idrac-bmc
+    group: hardware
+    url: https://10.135.4.2/redfish/v1/
+    interval: 10m
+    # BMC TLS is slow-ish and throttles bursts — give it room.
+    client:
+      insecure: true
+      timeout: 20s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 8000"
+
+  - name: idrac-system-health
+    enabled: false   # flip to true once status-read creds are fixed
+    group: hardware
+    url: https://10.135.4.2/redfish/v1/Systems/System.Embedded.1
+    interval: 10m
+    client:
+      insecure: true
+      timeout: 20s
+    headers:
+      Authorization: Basic ${GATUS_IDRAC_BASIC}
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].Status.Health == OK"
+
+  - name: idrac-manager-health
+    enabled: false   # flip to true once status-read creds are fixed
+    group: hardware
+    url: https://10.135.4.2/redfish/v1/Managers/iDRAC.Embedded.1
+    interval: 10m
+    client:
+      insecure: true
+      timeout: 20s
+    headers:
+      Authorization: Basic ${GATUS_IDRAC_BASIC}
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].Status.Health == OK"
+
+  - name: idrac-thermal
+    enabled: false   # flip to true once creds work; tighten conditions to payload
+    group: hardware
+    url: https://10.135.4.2/redfish/v1/Thermal
+    interval: 10m
+    client:
+      insecure: true
+      timeout: 20s
+    headers:
+      Authorization: Basic ${GATUS_IDRAC_BASIC}
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: idrac-power
+    enabled: false   # flip to true once creds work; tighten conditions to payload
+    group: hardware
+    url: https://10.135.4.2/redfish/v1/Power
+    interval: 10m
+    client:
+      insecure: true
+      timeout: 20s
+    headers:
+      Authorization: Basic ${GATUS_IDRAC_BASIC}
+    conditions:
+      - "[STATUS] == 200"
+# Onion — the .onion mirror of micr0's site (proxied through local Tor SOCKS)
+# ============================================================================
+  - name: "xm2xl5qvso5asx54enwxxgjqkclspmgmf7oijquczmj2ywj4nnffssqd.onion — micr0byte dev site"
+    group: onion
+    url: http://xm2xl5qvso5asx54enwxxgjqkclspmgmf7oijquczmj2ywj4nnffssqd.onion/
+    interval: 10m
+    # Tor circuits are slow: 30s timeout, generous response-time condition.
+    client:
+      proxy-url: socks5://127.0.0.1:9050
+      timeout: 30s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*<title>micr0byte*)"
+      - "[RESPONSE_TIME] < 25000"
+
+  - name: onion-vhost-internal
+    group: onion
+    url: http://127.0.0.1:8080/
+    interval: 10m
+    # Same vhost apache serves for the onion — separates "Tor path broken"
+    # from "site broken" (needs the onion Host header).
+    headers:
+      Host: xm2xl5qvso5asx54enwxxgjqkclspmgmf7oijquczmj2ywj4nnffssqd.onion
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*<title>micr0byte*)"
+
+external-endpoints:
+# --- pushed by agent crontab (hw-push.sh every 2 min); heartbeat = dead-pusher alarm
+  - name: disk-root
+    group: hardware
+    token: ${GATUS_HW_TOKEN}
+    heartbeat:
+      interval: 5m
+  - name: disk-home
+    group: hardware
+    token: ${GATUS_HW_TOKEN}
+    heartbeat:
+      interval: 5m
+  - name: disk-boot
+    group: hardware
+    token: ${GATUS_HW_TOKEN}
+    heartbeat:
+      interval: 5m
+  - name: disk-boot-efi
+    group: hardware
+    token: ${GATUS_HW_TOKEN}
+    heartbeat:
+      interval: 5m
+  - name: disk-tank
+    group: hardware
+    token: ${GATUS_HW_TOKEN}
+    heartbeat:
+      interval: 5m
+  - name: ram
+    group: hardware
+    token: ${GATUS_HW_TOKEN}
+    heartbeat:
+      interval: 5m
+  - name: swap
+    group: hardware
+    token: ${GATUS_HW_TOKEN}
+    heartbeat:
+      interval: 5m
+
+# ============================================================================
