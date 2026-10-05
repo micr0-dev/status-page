@@ -480,26 +480,27 @@ endpoints:
       - "[STATUS] < 500"
 
 # --- iDRAC 9 / Redfish (mgmt net 10.135.4.2, self-signed cert) ---
-# BMC root needs NO auth; the authenticated health endpoints are staged with
-# enabled:false until the status-read credentials verify (2026-10-05: Redfish
-# rejects them with SYS415 invalid username/password — re-check with the user).
+# Auth verified 2026-10-05: the status-read password has SPACES ON BOTH ENDS
+# (base64 in gatus.env: printf 'status-read: VWHF...b ' | base64).
+# Probe cadence is staggered (10m..15m) so Gatus never bursts the BMC.
   - name: idrac-bmc
     group: hardware
-    url: https://10.135.4.2/redfish/v1/
+    url: https://169.254.1.1/redfish/v1/
     interval: 10m
-    # BMC TLS is slow-ish and throttles bursts — give it room.
+    # Probed via the OS-to-iDRAC passthrough link (iface `idrac`, 169.254.1.2
+    # -> 169.254.1.1) — the mgmt net (10.135.4.2) blacklisted this box after
+    # failed logins; passthrough has its own MAC/IP and is unaffected.
     client:
       insecure: true
       timeout: 20s
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 8000"
-
+      - "[BODY].RedfishVersion != null"
   - name: idrac-system-health
-    enabled: false   # flip to true once status-read creds are fixed
     group: hardware
-    url: https://10.135.4.2/redfish/v1/Systems/System.Embedded.1
-    interval: 10m
+    url: https://169.254.1.1/redfish/v1/Systems/System.Embedded.1
+    interval: 11m
     client:
       insecure: true
       timeout: 20s
@@ -508,12 +509,11 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[BODY].Status.Health == OK"
-
+      - "[BODY].PowerState == On"
   - name: idrac-manager-health
-    enabled: false   # flip to true once status-read creds are fixed
     group: hardware
-    url: https://10.135.4.2/redfish/v1/Managers/iDRAC.Embedded.1
-    interval: 10m
+    url: https://169.254.1.1/redfish/v1/Managers/iDRAC.Embedded.1
+    interval: 12m
     client:
       insecure: true
       timeout: 20s
@@ -522,34 +522,54 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[BODY].Status.Health == OK"
-
   - name: idrac-thermal
-    enabled: false   # flip to true once creds work; tighten conditions to payload
     group: hardware
-    url: https://10.135.4.2/redfish/v1/Thermal
-    interval: 10m
+    url: https://169.254.1.1/redfish/v1/Chassis/System.Embedded.1/Thermal
+    interval: 13m
     client:
       insecure: true
       timeout: 20s
     headers:
       Authorization: Basic ${GATUS_IDRAC_BASIC}
+    # NOTE: on iDRAC 7.x / Redfish 1.17 the Thermal+Power resources live under
+    # Chassis/... (root /Thermal /Power are gone — SYS403).
+    # Sensor order observed 2026-10-05: [0]=CPU1 [1]=CPU2 [2]=Inlet [3]=GPU8
+    # [4]=Exhaust. Index [2] = inlet temp; threshold 45C (normally 24C).
     conditions:
       - "[STATUS] == 200"
-
+      - "[BODY].Fans[0].Status.Health == OK"
+      - "[BODY].Temperatures[2].ReadingCelsius < 45"
   - name: idrac-power
-    enabled: false   # flip to true once creds work; tighten conditions to payload
     group: hardware
-    url: https://10.135.4.2/redfish/v1/Power
-    interval: 10m
+    url: https://169.254.1.1/redfish/v1/Chassis/System.Embedded.1/Power
+    interval: 14m
     client:
       insecure: true
       timeout: 20s
     headers:
       Authorization: Basic ${GATUS_IDRAC_BASIC}
+    # Dual PSU (PS1+PS2, both Health=OK at probe time; ~210W consumed).
     conditions:
       - "[STATUS] == 200"
-# Onion — the .onion mirror of micr0's site (proxied through local Tor SOCKS)
-# ============================================================================
+      - "[BODY].PowerSupplies[0].Status.Health == OK"
+      - "[BODY].PowerSupplies[1].Status.Health == OK"
+      - "[BODY].PowerControl[0].PowerConsumedWatts > 10"
+
+  - name: idrac-chassis-health
+    group: hardware
+    url: https://169.254.1.1/redfish/v1/Chassis/System.Embedded.1
+    interval: 15m
+    client:
+      insecure: true
+      timeout: 20s
+    headers:
+      Authorization: Basic ${GATUS_IDRAC_BASIC}
+    # HealthRollup aggregates thermal+power+storage+firmware across the chassis.
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].Status.HealthRollup == OK"
+      - "[BODY].PowerState == On"
+
   - name: "xm2xl5qvso5asx54enwxxgjqkclspmgmf7oijquczmj2ywj4nnffssqd.onion — micr0byte dev site"
     group: onion
     url: http://xm2xl5qvso5asx54enwxxgjqkclspmgmf7oijquczmj2ywj4nnffssqd.onion/
