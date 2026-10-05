@@ -76,26 +76,30 @@ ui:
 metrics: true   # Prometheus /metrics on 127.0.0.1:8069 (proxied path /metrics via httpd if desired)
 
 alerting:
-  # Failing endpoint (>=2 consecutive failures) opens an issue in the
-  # status-page repo; recovery (>=2 successes) closes it.
-  # Token is NEVER in this file: systemd EnvironmentFile loads
-  # /home/agent/gatus/gatus.env -> GATUS_GITHUB_TOKEN (expandos: ${VAR}).
-  github:
-    repository-url: https://github.com/micr0-dev/status-page
-    token: ${GATUS_GITHUB_TOKEN}
+  # Email alerts via Postmark HTTP API (broadcast stream, from alert@status.micr0.dev).
+  # Gatus's native SMTP provider cannot set the X-PM-Message-Stream header, so we
+  # call api.postmarkapp.com with the same server token — identical outcome, exact
+  # stream control. The token lives in gatus.env (repo copy keeps the ${...} form).
+  custom:
+    url: https://api.postmarkapp.com/email
+    method: POST
+    headers:
+      Accept: application/json
+      Content-Type: application/json
+      X-Postmark-Server-Token: ${GATUS_POSTMARK_TOKEN}
+    body: '{"From":"alert@status.micr0.dev","To":"micr0@micr0.dev","MessageStream":"broadcast","Subject":"[Gatus] [ALERT_TRIGGERED_OR_RESOLVED]: [ENDPOINT_NAME]","TextBody":"[ALERT_TRIGGERED_OR_RESOLVED] - [ENDPOINT_GROUP]/[ENDPOINT_NAME]\n\nURL: [ENDPOINT_URL]\nErrors: [RESULT_ERRORS]\nConditions: [RESULT_CONDITIONS]\n\nstatus.micr0.dev"}'
     default-alert:
       failure-threshold: 2
       success-threshold: 2
-      minimum-reminder-interval: 30m
+      minimum-reminder-interval: 4h   # 30m spammed hundreds of emails/day for chronic reds (2026-10-06 incident)
 
-# ============================================================================
-# ENDPOINTS  (groups shown as sections on the dashboard)
-# ============================================================================
 endpoints:
 
   # ------------------------------------------------------------- status page
   - name: status-page
     group: "status page"
+    alerts:
+      - type: custom
     url: http://127.0.0.1:8069/health
     interval: 1m
     conditions:
@@ -105,6 +109,8 @@ endpoints:
   # ------------------------------------------------------------- core sites
   - name: micr0.dev
     group: "core sites"
+    alerts:
+      - type: custom
     url: https://micr0.dev/
     interval: 1m
     conditions:
@@ -114,6 +120,8 @@ endpoints:
 
   - name: the-number.site
     group: "core sites"
+    alerts:
+      - type: custom
     url: https://the-number.site/
     interval: 1m
     conditions:
@@ -123,6 +131,8 @@ endpoints:
 
   - name: ventboard.site
     group: "core sites"
+    alerts:
+      - type: custom
     url: https://ventboard.site/
     interval: 1m
     conditions:
@@ -133,6 +143,8 @@ endpoints:
 
   - name: cavareader.app
     group: "core sites"
+    alerts:
+      - type: custom
     url: https://cavareader.app/
     interval: 1m
     conditions:
@@ -142,6 +154,8 @@ endpoints:
 
   - name: tokimun.love
     group: "core sites"
+    alerts:
+      - type: custom
     url: https://tokimun.love/
     interval: 1m
     conditions:
@@ -151,6 +165,8 @@ endpoints:
 
   - name: wellness-p.ing
     group: "core sites"
+    alerts:
+      - type: custom
     url: https://wellness-p.ing/
     interval: 1m
     conditions:
@@ -160,6 +176,8 @@ endpoints:
 
   - name: q.micr0.dev-ama
     group: "core sites"
+    alerts:
+      - type: custom
     url: http://127.0.0.1:8120/
     interval: 5m
     conditions:
@@ -168,6 +186,8 @@ endpoints:
 
   - name: fuzzies.wtf
     group: "fediverse"
+    alerts:
+      - type: custom
     url: https://fuzzies.wtf/api/v1/instance
     interval: 1m
     conditions:
@@ -178,6 +198,8 @@ endpoints:
 
   - name: mastodon-web-internal
     group: "fediverse"
+    alerts:
+      - type: custom
     url: http://127.0.0.1:3001/api/v1/instance
     interval: 5m
     # Puma behind apache needs the real Host (else 403) + X-Forwarded-Proto
@@ -191,6 +213,8 @@ endpoints:
 
   - name: mastodon-streaming-internal
     group: "fediverse"
+    alerts:
+      - type: custom
     url: tcp://127.0.0.1:4000
     interval: 5m
     conditions:
@@ -198,6 +222,8 @@ endpoints:
 
   - name: altbot
     group: "fediverse"
+    alerts:
+      - type: custom
     url: https://altbot.micr0.dev/
     interval: 1m
     conditions:
@@ -206,6 +232,8 @@ endpoints:
 
   - name: altbot-api-internal
     group: "fediverse"
+    alerts:
+      - type: custom
     url: http://127.0.0.1:8186/api/
     interval: 5m
     # API root answers 404 — still proves the backend process is alive.
@@ -215,6 +243,8 @@ endpoints:
 
   - name: a.fuzzies.wtf-akkoma
     group: "fediverse"
+    alerts:
+      - type: custom
     url: https://a.fuzzies.wtf/
     interval: 5m
     # 403 right now (DocumentRoot indexes denied) — asserts "not 5xx" so the
@@ -225,6 +255,8 @@ endpoints:
 
   - name: ap
     group: "fediverse"
+    alerts:
+      - type: custom
     url: https://ap.micr0.dev/
     interval: 1m
     conditions:
@@ -234,6 +266,8 @@ endpoints:
   # ------------------------------------------------------------- media
   - name: owncast-tv
     group: "media"
+    alerts:
+      - type: custom
     url: https://tv.micr0.dev/
     interval: 1m
     conditions:
@@ -243,6 +277,8 @@ endpoints:
 
   - name: owncast-rtmp-internal
     group: "media"
+    alerts:
+      - type: custom
     url: tcp://127.0.0.1:1935
     interval: 5m
     conditions:
@@ -250,6 +286,8 @@ endpoints:
 
   - name: immich
     group: "media"
+    alerts:
+      - type: custom
     url: https://immich.micr0.dev/
     interval: 1m
     # DOWN (backend :2283 not listening) — turns green when up.
@@ -259,6 +297,8 @@ endpoints:
 
   - name: tube
     group: "media"
+    alerts:
+      - type: custom
     url: https://tube.micr0.dev/
     interval: 5m
     # DOWN (backend :4771 not listening) — turns green when up.
@@ -268,6 +308,8 @@ endpoints:
   # ------------------------------------------------------------- ai & tools
   - name: open-webui
     group: "ai & tools"
+    alerts:
+      - type: custom
     url: https://ai.micr0.dev/health
     interval: 1m
     conditions:
@@ -278,6 +320,8 @@ endpoints:
 
   - name: open-webui-internal
     group: "ai & tools"
+    alerts:
+      - type: custom
     url: http://127.0.0.1:8371/health
     interval: 5m
     conditions:
@@ -286,6 +330,8 @@ endpoints:
 
   - name: ollama
     group: "ai & tools"
+    alerts:
+      - type: custom
     url: http://127.0.0.1:11434/api/tags
     interval: 1m
     conditions:
@@ -294,6 +340,8 @@ endpoints:
 
   - name: meet-jitsi
     group: "ai & tools"
+    alerts:
+      - type: custom
     url: https://meet.micr0.dev/about
     interval: 1m
     conditions:
@@ -302,6 +350,8 @@ endpoints:
 
   - name: hedgedoc-docs
     group: "ai & tools"
+    alerts:
+      - type: custom
     url: https://doc.micr0.dev/
     interval: 1m
     conditions:
@@ -312,6 +362,8 @@ endpoints:
 
   - name: docs-tokimun
     group: "ai & tools"
+    alerts:
+      - type: custom
     url: https://docs.tokimun.love/
     interval: 5m
     conditions:
@@ -320,6 +372,8 @@ endpoints:
 
   - name: send
     group: "ai & tools"
+    alerts:
+      - type: custom
     url: https://send.micr0.dev/
     interval: 1m
     conditions:
@@ -330,6 +384,8 @@ endpoints:
 
   - name: 12ft
     group: "ai & tools"
+    alerts:
+      - type: custom
     url: https://12ft.micr0.dev/
     interval: 5m
     conditions:
@@ -338,6 +394,8 @@ endpoints:
 
   - name: analytics.micr0.dev
     group: "ai & tools"
+    alerts:
+      - type: custom
     url: https://analytics.micr0.dev/
     interval: 5m
     # 301 → followed by default (ignore-redirect is off) → final 200 expected.
@@ -348,6 +406,8 @@ endpoints:
   # ------------------------------------------------------------- chat
   - name: chat-micr0
     group: "chat"
+    alerts:
+      - type: custom
     url: http://127.0.0.1:8367/
     interval: 5m
     conditions:
@@ -357,6 +417,8 @@ endpoints:
   # ------------------------------------------------------------- games
   - name: minecraft
     group: "games"
+    alerts:
+      - type: custom
     url: tcp://127.0.0.1:25565
     interval: 1m
     conditions:
@@ -364,6 +426,8 @@ endpoints:
 
   - name: factorio
     group: "games"
+    alerts:
+      - type: custom
     url: udp://127.0.0.1:34197
     interval: 5m
     conditions:
@@ -371,6 +435,8 @@ endpoints:
 
   - name: factorio-rcon
     group: "games"
+    alerts:
+      - type: custom
     url: tcp://127.0.0.1:27015
     interval: 5m
     conditions:
@@ -378,6 +444,8 @@ endpoints:
 
   - name: lanparty-relay
     group: "games"
+    alerts:
+      - type: custom
     url: tcp://127.0.0.1:41277
     interval: 5m
     conditions:
@@ -385,6 +453,8 @@ endpoints:
 
   - name: coturn
     group: "games"
+    alerts:
+      - type: custom
     url: tcp://127.0.0.1:3478
     interval: 5m
     # Currently inactive (unit off) — red is TRUE; green when coturn runs.
@@ -394,6 +464,8 @@ endpoints:
   # ------------------------------------------------------------- infra
   - name: alttron-ssh
     group: "infra"
+    alerts:
+      - type: custom
     url: ssh://23.131.76.144
     interval: 5m
     conditions:
@@ -401,6 +473,8 @@ endpoints:
 
   - name: alttron-origin-https
     group: "infra"
+    alerts:
+      - type: custom
     url: https://23.131.76.144/
     interval: 1m
     # Raw-IP TLS = hostname mismatch on purpose → skip cert verification.
@@ -412,6 +486,8 @@ endpoints:
 
   - name: postgresql
     group: "infra"
+    alerts:
+      - type: custom
     url: tcp://127.0.0.1:5432
     interval: 1m
     conditions:
@@ -419,6 +495,8 @@ endpoints:
 
   - name: redis
     group: "infra"
+    alerts:
+      - type: custom
     url: tcp://127.0.0.1:6379
     interval: 5m
     conditions:
@@ -426,6 +504,8 @@ endpoints:
 
   - name: stalwart-mail-smtps
     group: "infra"
+    alerts:
+      - type: custom
     url: tcp://127.0.0.1:465
     interval: 10m
     # Port 465 speaks TLS but with a SELF-SIGNED rcgen cert (not LE), so a
@@ -435,6 +515,8 @@ endpoints:
 
   - name: stalwart-mail-smtp
     group: "infra"
+    alerts:
+      - type: custom
     url: tcp://127.0.0.1:25
     interval: 10m
     conditions:
@@ -443,6 +525,8 @@ endpoints:
   # ------------------------------------------------------------- dns & web
   - name: dns-micr0-dev
     group: "dns & web"
+    alerts:
+      - type: custom
     url: 1.1.1.1
     interval: 5m
     dns:
@@ -453,6 +537,8 @@ endpoints:
 
   - name: dns-status-page
     group: "dns & web"
+    alerts:
+      - type: custom
     url: 1.1.1.1
     interval: 5m
     dns:
@@ -463,6 +549,8 @@ endpoints:
 
   - name: dns-fuzzies-wtf
     group: "dns & web"
+    alerts:
+      - type: custom
     url: 1.1.1.1
     interval: 10m
     dns:
@@ -473,6 +561,8 @@ endpoints:
 
   - name: httpd-origin-80
     group: "dns & web"
+    alerts:
+      - type: custom
     url: http://127.0.0.1:80/
     interval: 1m
     conditions:
@@ -485,6 +575,8 @@ endpoints:
 # Probe cadence is staggered (10m..15m) so Gatus never bursts the BMC.
   - name: idrac-bmc
     group: hardware
+    alerts:
+      - type: custom
     url: https://169.254.1.1/redfish/v1/
     interval: 10m
     # Probed via the OS-to-iDRAC passthrough link (iface `idrac`, 169.254.1.2
@@ -499,6 +591,8 @@ endpoints:
       - "[BODY].RedfishVersion != null"
   - name: idrac-system-health
     group: hardware
+    alerts:
+      - type: custom
     url: https://169.254.1.1/redfish/v1/Systems/System.Embedded.1
     interval: 11m
     client:
@@ -512,6 +606,8 @@ endpoints:
       - "[BODY].PowerState == On"
   - name: idrac-manager-health
     group: hardware
+    alerts:
+      - type: custom
     url: https://169.254.1.1/redfish/v1/Managers/iDRAC.Embedded.1
     interval: 12m
     client:
@@ -524,6 +620,8 @@ endpoints:
       - "[BODY].Status.Health == OK"
   - name: idrac-thermal
     group: hardware
+    alerts:
+      - type: custom
     url: https://169.254.1.1/redfish/v1/Chassis/System.Embedded.1/Thermal
     interval: 13m
     client:
@@ -541,6 +639,8 @@ endpoints:
       - "[BODY].Temperatures[2].ReadingCelsius < 45"
   - name: idrac-power
     group: hardware
+    alerts:
+      - type: custom
     url: https://169.254.1.1/redfish/v1/Chassis/System.Embedded.1/Power
     interval: 14m
     client:
@@ -557,6 +657,8 @@ endpoints:
 
   - name: idrac-chassis-health
     group: hardware
+    alerts:
+      - type: custom
     url: https://169.254.1.1/redfish/v1/Chassis/System.Embedded.1
     interval: 15m
     client:
@@ -572,6 +674,8 @@ endpoints:
 
   - name: "xm2xl5qvso5asx54enwxxgjqkclspmgmf7oijquczmj2ywj4nnffssqd.onion — micr0byte dev site"
     group: onion
+    alerts:
+      - type: custom
     url: http://xm2xl5qvso5asx54enwxxgjqkclspmgmf7oijquczmj2ywj4nnffssqd.onion/
     interval: 10m
     # Tor circuits are slow: 30s timeout, generous response-time condition.
@@ -585,6 +689,8 @@ endpoints:
 
   - name: onion-vhost-internal
     group: onion
+    alerts:
+      - type: custom
     url: http://127.0.0.1:8080/
     interval: 10m
     # Same vhost apache serves for the onion — separates "Tor path broken"
