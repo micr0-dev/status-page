@@ -166,17 +166,6 @@ endpoints:
       - "[STATUS] == 200"
       - "[BODY] == pat(*<title>Micr0&#39;s AMA*)"
 
-  - name: blog.micr0.dev
-    group: "core sites"
-    url: https://blog.micr0.dev/
-    interval: 5m
-    # KNOWN BROKEN (526: proxied, origin serves no cert for this name).
-    # Kept enabled ON PURPOSE — go green when the vhost/cert is fixed.
-    conditions:
-      - "[STATUS] == 200"
-      - "[CONNECTED] == true"
-
-  # ------------------------------------------------------------- fediverse
   - name: fuzzies.wtf
     group: "fediverse"
     url: https://fuzzies.wtf/api/v1/instance
@@ -233,15 +222,6 @@ endpoints:
     conditions:
       - "[STATUS] < 500"
       - "[CONNECTED] == true"
-
-  - name: birdy
-    group: "fediverse"
-    url: https://birdy.micr0.dev/
-    interval: 1m
-    # DOWN since launch (backend :3221 not listening) — turns green when up.
-    conditions:
-      - "[STATUS] == 200"
-      - "[RESPONSE_TIME] < 5000"
 
   - name: ap
     group: "fediverse"
@@ -356,14 +336,6 @@ endpoints:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 5000"
 
-  - name: safety
-    group: "ai & tools"
-    url: https://safety.micr0.dev/
-    interval: 5m
-    # DOWN (backend :8082 not listening) — turns green when up.
-    conditions:
-      - "[STATUS] == 200"
-
   - name: analytics.micr0.dev
     group: "ai & tools"
     url: https://analytics.micr0.dev/
@@ -374,22 +346,6 @@ endpoints:
       - "[RESPONSE_TIME] < 5000"
 
   # ------------------------------------------------------------- chat
-  - name: zubr-chat
-    group: "chat"
-    url: https://zubr.chat/
-    interval: 1m
-    # Currently failing (backends :9001/:3000 closed) — turns green when up.
-    conditions:
-      - "[STATUS] == 200"
-      - "[CONNECTED] == true"
-
-  - name: zubr-web-internal
-    group: "chat"
-    url: tcp://127.0.0.1:9001
-    interval: 5m
-    conditions:
-      - "[CONNECTED] == true"
-
   - name: chat-micr0
     group: "chat"
     url: http://127.0.0.1:8367/
