@@ -1,0 +1,524 @@
+# ============================================================================
+# Gatus configuration — micr0.dev infrastructure  (Gatus v5.37.0)
+# Status page: https://status.micr0.dev
+# Lives on prod (AltTron) at: /home/agent/gatus/config.yaml
+#
+# >>> HOW TO ADD A NEW SERVICE (agents — this is your runbook) <<<
+#   Gatus runs AS the agent user and hot-reloads this file on save (watcher).
+#   NO ROOT, NO RESTART NEEDED for config edits. Full details: ~/Uptime.md
+#   on the OpenTerminal box.
+#   1. PROBE FIRST (from this OpenTerminal box or prod):
+#        curl -sk -o /dev/null -w "%{http_code}\n" https://new.site/
+#      Set conditions to what it ACTUALLY returns (200? JSON field? title?).
+#   2. Append a block to the end of this file (copy an existing one):
+#        ssh -i ~/.ssh/id_ed25519 agent@23.131.76.144 \
+#          'cat >> /home/agent/gatus/config.yaml' <<'EOF'
+#        # ---------------- new service ----------------
+#        - name: new-service
+#          group: "core sites"          # reuse an existing group if it fits
+#          url: https://new.site/
+#          interval: 1m
+#          conditions:
+#            - "[STATUS] == 200"
+#            - "[RESPONSE_TIME] < 5000"
+#            - "[CERTIFICATE_EXPIRATION] > 720h"
+#        EOF
+#   3. Verify it loaded + is green:
+#        journalctl -u gatus -n 20 --no-pager   # "config file reloaded" / no errors
+#        curl -sk https://status.micr0.dev/api/v1/config | jq '.endpoints[].name'
+#      `skip-invalid-config-update: true` is set, so a bad edit will NOT kill
+#      the running instance — it just refuses the reload (you'll see it in logs).
+#   4. Mirror the change into github.com/micr0-dev/status-page (config/config.yaml).
+#
+#   Backend-internal services (not public): use http://127.0.0.1:<port>,
+#   tcp://127.0.0.1:<port>, udp://…, tls://…, starttls://…, ssh:// — Gatus runs
+#   ON the prod box, so loopback = "is the backend process alive".
+#   Public + internal for the same service = two endpoints (edge vs backend).
+#
+# Condition placeholders: [STATUS] [RESPONSE_TIME](ms) [BODY] [BODY].json.path
+#   [CONNECTED] [IP] [DNS_RCODE] [CERTIFICATE_EXPIRATION](ms) [DOMAIN_EXPIRATION](ms)
+# Functions: pat(*wildcard*)  any(a,b)  len()  has()
+# Operators: == != < <= > >=      (all conditions must pass = UP)
+# [DOMAIN_EXPIRATION] exists but is intentionally unused here: whois/RDAP
+# lookups can flake and cause false reds — add it per-endpoint only if wanted.
+# ============================================================================
+
+debug: false
+skip-invalid-config-update: true   # a bad hot-reload edit never kills the running instance
+
+web:
+  address: 127.0.0.1                # only httpd (ProxyPass) reaches us
+  port: 8069
+
+storage:
+  type: sqlite
+  path: /home/agent/gatus/data/gatus.db
+  maximum-number-of-results: 1000
+  maximum-number-of-events: 6
+
+ui:
+  title: micr0.dev — Status
+  header: micr0.dev
+  link: https://micr0.dev
+  description: Uptime & health for every service micr0 runs.
+  dashboard-heading: All Systems
+  dashboard-subheading: Public + internal services on AltTron (micr0.dev) and friends.
+  dark-mode: true
+  default-sort-by: group
+  buttons:
+    - name: micr0.dev
+      link: https://micr0.dev
+    - name: Altbot (Fediverse alt-text bot)
+      link: https://altbot.micr0.dev
+    - name: GitHub
+      link: https://github.com/micr0-dev
+
+metrics: true   # Prometheus /metrics on 127.0.0.1:8069 (proxied path /metrics via httpd if desired)
+
+alerting:
+  # Failing endpoint (>=2 consecutive failures) opens an issue in the
+  # status-page repo; recovery (>=2 successes) closes it.
+  # Token is NEVER in this file: systemd EnvironmentFile loads
+  # /home/agent/gatus/gatus.env -> GATUS_GITHUB_TOKEN (expandos: ${VAR}).
+  github:
+    repository-url: https://github.com/micr0-dev/status-page
+    token: ${GATUS_GITHUB_TOKEN}
+    default-alert:
+      failure-threshold: 2
+      success-threshold: 2
+      minimum-reminder-interval: 30m
+
+# ============================================================================
+# ENDPOINTS  (groups shown as sections on the dashboard)
+# ============================================================================
+endpoints:
+
+  # ------------------------------------------------------------- status page
+  - name: status-page
+    group: "status page"
+    url: http://127.0.0.1:8069/health
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[CONNECTED] == true"
+
+  # ------------------------------------------------------------- core sites
+  - name: micr0.dev
+    group: "core sites"
+    url: https://micr0.dev/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 720h"
+
+  - name: the-number.site
+    group: "core sites"
+    url: https://the-number.site/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 720h"
+
+  - name: ventboard.site
+    group: "core sites"
+    url: https://ventboard.site/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*<title>Vent Board*)"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 720h"
+
+  - name: cavareader.app
+    group: "core sites"
+    url: https://cavareader.app/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 720h"
+
+  - name: tokimun.love
+    group: "core sites"
+    url: https://tokimun.love/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 720h"
+
+  - name: wellness-p.ing
+    group: "core sites"
+    url: https://wellness-p.ing/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*<title>Wellness Ping*)"
+      - "[RESPONSE_TIME] < 5000"
+
+  - name: q.micr0.dev-ama
+    group: "core sites"
+    url: http://127.0.0.1:8120/
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*<title>Micr0&#39;s AMA*)"
+
+  - name: blog.micr0.dev
+    group: "core sites"
+    url: https://blog.micr0.dev/
+    interval: 5m
+    # KNOWN BROKEN (526: proxied, origin serves no cert for this name).
+    # Kept enabled ON PURPOSE — go green when the vhost/cert is fixed.
+    conditions:
+      - "[STATUS] == 200"
+      - "[CONNECTED] == true"
+
+  # ------------------------------------------------------------- fediverse
+  - name: fuzzies.wtf
+    group: "fediverse"
+    url: https://fuzzies.wtf/api/v1/instance
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].uri == fuzzies.wtf"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 720h"
+
+  - name: mastodon-web-internal
+    group: "fediverse"
+    url: http://127.0.0.1:3001/api/v1/instance
+    interval: 5m
+    # Puma behind apache needs the real Host (else 403) + X-Forwarded-Proto
+    # (else 301 http->https). Gatus special-cases the Host header -> request.Host.
+    headers:
+      Host: fuzzies.wtf
+      X-Forwarded-Proto: https
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].uri == fuzzies.wtf"
+
+  - name: mastodon-streaming-internal
+    group: "fediverse"
+    url: tcp://127.0.0.1:4000
+    interval: 5m
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: altbot
+    group: "fediverse"
+    url: https://altbot.micr0.dev/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+
+  - name: altbot-api-internal
+    group: "fediverse"
+    url: http://127.0.0.1:8186/api/
+    interval: 5m
+    # API root answers 404 — still proves the backend process is alive.
+    conditions:
+      - "[STATUS] == 404"
+      - "[CONNECTED] == true"
+
+  - name: a.fuzzies.wtf-akkoma
+    group: "fediverse"
+    url: https://a.fuzzies.wtf/
+    interval: 5m
+    # 403 right now (DocumentRoot indexes denied) — asserts "not 5xx" so the
+    # monitor tracks availability; tighten to == 200 once content is served.
+    conditions:
+      - "[STATUS] < 500"
+      - "[CONNECTED] == true"
+
+  - name: birdy
+    group: "fediverse"
+    url: https://birdy.micr0.dev/
+    interval: 1m
+    # DOWN since launch (backend :3221 not listening) — turns green when up.
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+
+  - name: ap
+    group: "fediverse"
+    url: https://ap.micr0.dev/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+
+  # ------------------------------------------------------------- media
+  - name: owncast-tv
+    group: "media"
+    url: https://tv.micr0.dev/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 720h"
+
+  - name: owncast-rtmp-internal
+    group: "media"
+    url: tcp://127.0.0.1:1935
+    interval: 5m
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: immich
+    group: "media"
+    url: https://immich.micr0.dev/
+    interval: 1m
+    # DOWN (backend :2283 not listening) — turns green when up.
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+
+  - name: tube
+    group: "media"
+    url: https://tube.micr0.dev/
+    interval: 5m
+    # DOWN (backend :4771 not listening) — turns green when up.
+    conditions:
+      - "[STATUS] == 200"
+
+  # ------------------------------------------------------------- ai & tools
+  - name: open-webui
+    group: "ai & tools"
+    url: https://ai.micr0.dev/health
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].status == true"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 720h"
+
+  - name: open-webui-internal
+    group: "ai & tools"
+    url: http://127.0.0.1:8371/health
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].status == true"
+
+  - name: ollama
+    group: "ai & tools"
+    url: http://127.0.0.1:11434/api/tags
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].models != null"
+
+  - name: meet-jitsi
+    group: "ai & tools"
+    url: https://meet.micr0.dev/about
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+
+  - name: hedgedoc-docs
+    group: "ai & tools"
+    url: https://doc.micr0.dev/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*<title>HedgeDoc*)"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 720h"
+
+  - name: docs-tokimun
+    group: "ai & tools"
+    url: https://docs.tokimun.love/
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+
+  - name: send
+    group: "ai & tools"
+    url: https://send.micr0.dev/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*<title>Send*)"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 720h"
+
+  - name: 12ft
+    group: "ai & tools"
+    url: https://12ft.micr0.dev/
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+
+  - name: safety
+    group: "ai & tools"
+    url: https://safety.micr0.dev/
+    interval: 5m
+    # DOWN (backend :8082 not listening) — turns green when up.
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: analytics.micr0.dev
+    group: "ai & tools"
+    url: https://analytics.micr0.dev/
+    interval: 5m
+    # 301 → followed by default (ignore-redirect is off) → final 200 expected.
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+
+  # ------------------------------------------------------------- chat
+  - name: zubr-chat
+    group: "chat"
+    url: https://zubr.chat/
+    interval: 1m
+    # Currently failing (backends :9001/:3000 closed) — turns green when up.
+    conditions:
+      - "[STATUS] == 200"
+      - "[CONNECTED] == true"
+
+  - name: zubr-web-internal
+    group: "chat"
+    url: tcp://127.0.0.1:9001
+    interval: 5m
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: chat-micr0
+    group: "chat"
+    url: http://127.0.0.1:8367/
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"
+      - "[CONNECTED] == true"
+
+  # ------------------------------------------------------------- games
+  - name: minecraft
+    group: "games"
+    url: tcp://127.0.0.1:25565
+    interval: 1m
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: factorio
+    group: "games"
+    url: udp://127.0.0.1:34197
+    interval: 5m
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: factorio-rcon
+    group: "games"
+    url: tcp://127.0.0.1:27015
+    interval: 5m
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: lanparty-relay
+    group: "games"
+    url: tcp://127.0.0.1:41277
+    interval: 5m
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: coturn
+    group: "games"
+    url: tcp://127.0.0.1:3478
+    interval: 5m
+    # Currently inactive (unit off) — red is TRUE; green when coturn runs.
+    conditions:
+      - "[CONNECTED] == true"
+
+  # ------------------------------------------------------------- infra
+  - name: alttron-ssh
+    group: "infra"
+    url: ssh://23.131.76.144
+    interval: 5m
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: alttron-origin-https
+    group: "infra"
+    url: https://23.131.76.144/
+    interval: 1m
+    # Raw-IP TLS = hostname mismatch on purpose → skip cert verification.
+    client:
+      insecure: true
+    conditions:
+      - "[CONNECTED] == true"
+      - "[STATUS] < 503"
+
+  - name: postgresql
+    group: "infra"
+    url: tcp://127.0.0.1:5432
+    interval: 1m
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: redis
+    group: "infra"
+    url: tcp://127.0.0.1:6379
+    interval: 5m
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: stalwart-mail-smtps
+    group: "infra"
+    url: tcp://127.0.0.1:465
+    interval: 10m
+    # Port 465 speaks TLS but with a SELF-SIGNED rcgen cert (not LE), so a
+    # certificate-expiry condition would be meaningless — liveness only.
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: stalwart-mail-smtp
+    group: "infra"
+    url: tcp://127.0.0.1:25
+    interval: 10m
+    conditions:
+      - "[CONNECTED] == true"
+
+  # ------------------------------------------------------------- dns & web
+  - name: dns-micr0-dev
+    group: "dns & web"
+    url: 1.1.1.1
+    interval: 5m
+    dns:
+      query-type: A
+      query-name: micr0.dev
+    conditions:
+      - "[DNS_RCODE] == NOERROR"
+
+  - name: dns-status-page
+    group: "dns & web"
+    url: 1.1.1.1
+    interval: 5m
+    dns:
+      query-type: A
+      query-name: status.micr0.dev
+    conditions:
+      - "[DNS_RCODE] == NOERROR"
+
+  - name: dns-fuzzies-wtf
+    group: "dns & web"
+    url: 1.1.1.1
+    interval: 10m
+    dns:
+      query-type: A
+      query-name: fuzzies.wtf
+    conditions:
+      - "[DNS_RCODE] == NOERROR"
+
+  - name: httpd-origin-80
+    group: "dns & web"
+    url: http://127.0.0.1:80/
+    interval: 1m
+    conditions:
+      - "[CONNECTED] == true"
+      - "[STATUS] < 500"
