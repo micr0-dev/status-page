@@ -455,9 +455,10 @@ endpoints:
     group: "games"
     alerts:
       - type: custom
-    url: tcp://127.0.0.1:3478
+    # coturn binds ONLY the public IP (no 127.0.0.1 listener) — probe the real bind.
+    url: tcp://23.131.76.144:3478
     interval: 5m
-    # Currently inactive (unit off) — red is TRUE; green when coturn runs.
+    # Restarted 2026-10-05 after the Sep-19 SEGV; STUN Binding verified OK from outside.
     conditions:
       - "[CONNECTED] == true"
 
