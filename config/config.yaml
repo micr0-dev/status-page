@@ -290,7 +290,9 @@ endpoints:
       - type: custom
     url: https://immich.micr0.dev/
     interval: 1m
-    # DOWN (backend :2283 not listening) — turns green when up.
+    # Restored 2026-10-06 (pinned IMMICH_VERSION=v2.7.5): floating 'release' (v3.x)
+    # dropped pgvecto-rs support and crash-looped against the pg14 DB; redis had a
+    # corrupt RDB. Vectorchord upgrade pending.
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 5000"
