@@ -290,9 +290,8 @@ endpoints:
       - type: custom
     url: https://immich.micr0.dev/
     interval: 1m
-    # Restored 2026-10-06 (pinned IMMICH_VERSION=v2.7.5): floating 'release' (v3.x)
-    # dropped pgvecto-rs support and crash-looped against the pg14 DB; redis had a
-    # corrupt RDB. Vectorchord upgrade pending.
+    # Upgraded to v3.2.4 + VectorChord 2026-10-06 (IMMICH_VERSION pinned exact —
+    # never float 'release': the floating tag broke the pgvecto-era DB for weeks).
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 5000"
