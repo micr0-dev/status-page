@@ -301,7 +301,7 @@ endpoints:
       - type: custom
     url: https://tube.micr0.dev/
     interval: 5m
-    # DOWN (backend :4771 not listening) — turns green when up.
+    # Backend restored 2026-10-06: OTT app container was absent; recreated via compose (now Up/healthy).
     conditions:
       - "[STATUS] == 200"
 
@@ -461,6 +461,17 @@ endpoints:
     # Restarted 2026-10-05 after the Sep-19 SEGV; STUN Binding verified OK from outside.
     conditions:
       - "[CONNECTED] == true"
+
+  - name: coturn-tls
+    group: "games"
+    alerts:
+      - type: custom
+    # TURNS (implicit TLS) on 5349 — enabled 2026-10-06 with the meet LE cert (SAN meet.micr0.dev).
+    url: tls://23.131.76.144:5349
+    interval: 5m
+    conditions:
+      - "[CONNECTED] == true"
+      - "[CERTIFICATE_EXPIRATION] > 720h"
 
   # ------------------------------------------------------------- infra
   - name: alttron-ssh
