@@ -584,8 +584,8 @@ endpoints:
       - "[STATUS] < 500"
 
 # --- iDRAC 9 / Redfish (mgmt net 10.135.4.2, self-signed cert) ---
-# Auth verified 2026-10-05: the status-read password has SPACES ON BOTH ENDS
-# (base64 in gatus.env: printf 'status-read: VWHF...b ' | base64).
+# Creds rotated 2026-10-06: password NO LONGER has surrounding spaces;
+# base64 = printf 'status-read:<pw>' | base64 -w0 (mirrored in gatus.env).
 # Probe cadence is staggered (10m..15m) so Gatus never bursts the BMC.
   - name: idrac-bmc
     group: hardware
