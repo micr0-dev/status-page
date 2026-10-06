@@ -466,8 +466,9 @@ endpoints:
     group: "games"
     alerts:
       - type: custom
-    # TURNS (implicit TLS) on 5349 — enabled 2026-10-06 with the meet LE cert (SAN meet.micr0.dev).
-    url: tls://23.131.76.144:5349
+    # TURNS (implicit TLS) on 5349 — enabled 2026-10-06 with the meet LE cert.
+    # Probe BY HOSTNAME: cert has DNS SAN meet.micr0.dev only (no IP SANs).
+    url: tls://meet.micr0.dev:5349
     interval: 5m
     conditions:
       - "[CONNECTED] == true"
