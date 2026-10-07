@@ -757,7 +757,7 @@ external-endpoints:
     group: hardware
     token: ${GATUS_HW_TOKEN}
     heartbeat:
-      interval: 12h
+      interval: 26h
 
 # ============================================================================
 
