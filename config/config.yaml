@@ -752,5 +752,21 @@ external-endpoints:
     token: ${GATUS_HW_TOKEN}
     heartbeat:
       interval: 5m
+  # --- pushed by root crontab (cert-audit.sh daily 04:30): LE cert expiry / renewal-conf audit
+  - name: certbot
+    group: hardware
+    token: ${GATUS_HW_TOKEN}
+    heartbeat:
+      interval: 12h
 
 # ============================================================================
+
+# maintenance: silences ALL alerts (pushed + polled) Tue 02:00-04:00 America/New_York
+# around the weekly reboot-timer (reboot-timer.service on AltTron).
+maintenance:
+  enabled: true
+  start: "02:00"
+  duration: 2h
+  timezone: "America/New_York"
+  every:
+    - "Tuesday"
