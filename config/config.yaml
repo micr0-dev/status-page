@@ -715,6 +715,39 @@ endpoints:
       - "[STATUS] == 200"
       - "[BODY] == pat(*<title>micr0byte*)"
 
+  # ------------------------------------------------------------- lab-gui (lab.micr0.dev)
+  # Agent GUIs over a Cloudflare tunnel, behind CF Access one-time codes.
+  # The public edge check follows the CF Access redirect chain and lands on
+  # the one-time-code login page (200, title "Sign in - Cloudflare Access")
+  # when healthy — that means edge + tunnel + mux all up. A 5xx/1033/530
+  # instead means the tunnel or edge is broken. The origin checks below
+  # (loopback, 5m) cover the mux + each UI separately. Runbook:
+  # LabGUI.md on the OpenTerminal box. NO `alerts:` — dashboard-only (see the
+  # push-path alert incident in Uptime.md before re-arming any alerts).
+  - name: lab-gui-public
+    group: "ai & tools"
+    url: https://lab.micr0.dev/
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+      - "[BODY] == pat(*Cloudflare Access*)"
+      - "[CERTIFICATE_EXPIRATION] > 720h"
+  - name: lab-gui-mux
+    group: "ai & tools"
+    url: http://127.0.0.1:8092/
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 3000"
+  - name: lab-gui-agent-chat
+    group: "ai & tools"
+    url: http://127.0.0.1:8092/chat/
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 3000"
+      - "[BODY] == pat(*Temporal Agent UI*)"
 external-endpoints:
 # --- pushed by agent crontab (hw-push.sh every 2 min); heartbeat = dead-pusher alarm
   - name: disk-root
